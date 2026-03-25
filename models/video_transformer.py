@@ -82,7 +82,7 @@ class TransformerBlock(nn.Module):
         self.norm1 = nn.LayerNorm(embedding_size)
         self.norm2 = nn.LayerNorm(embedding_size)
     
-    def get_positional_encoding(self, num_tokens, embed_dim):
+    def get_1D_positional_encoding(self, num_tokens, embed_dim):
         postional_embedding = torch.zeros(num_tokens, embed_dim, dtype=torch.float32)
         positions = torch.arange(0, num_tokens, dtype=torch.float32)
         for pos in positions:
@@ -93,9 +93,18 @@ class TransformerBlock(nn.Module):
                     positional_embedding[pos, i] = math.cos(pos / (10000 ** ((i-1)/embed_dim)))
         return positional_embedding
 
+    def get_2D_positional_encoding(self, num_tokens, embed_dim):
+        num_tokens_x = num_tokens_y = int(num_tokens ** 0.5)
+        embed_x = embed_y = embed_dim // 2
+        grid = torch.stack(torch.meshgrid(torch.arange(num_tokens_x), torch.arange(num_tokens_y), indexing='ij'), dim=0)
+        pos_x = self.get_1D_positional_encoding(num_tokens_x, embed_x)
+        pos_y = self.get_1D_positional_encoding(num_tokens_y, embed_y)
+        positional_embedding = torch.cat([pos_y, pos_x], dim=1).unsqueeze(0)
+        return positional_embedding
+
     def forward(self, x):
         batch_size, num_tokens, embed_dim = x.shape
-        positional_embedding = self.get_positional_encoding(num_tokens, embed_dim)
+        positional_embedding = self.get_2D_positional_encoding(num_tokens, embed_dim)
         x = x + positional_embedding
         residuals = x.clone()
         x = self.norm1(x)
