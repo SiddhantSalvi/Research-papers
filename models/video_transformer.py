@@ -14,26 +14,6 @@ import warnings
 import importlib
 import collections
 
-class ImageTransformer(nn.Module):
-    def __init__(self, num_heads, num_layers, embedding_size, dropout=0.1):
-        super(ImageTransformer, self).__init__()
-        self.num_heads = num_heads
-        self.num_layers = num_layers
-        self.embedding_size = embedding_size
-        self.dropout = dropout
-        self.transformer_blocks = nn.ModuleList([
-            TransformerBlock(
-                embedding_size=embedding_size,
-                num_heads=num_heads,
-                dropout=dropout
-            ) for _ in range(num_layers)
-        ])
-    
-    def forward(self, x):
-        for block in self.transformer_blocks:
-            x = block(x)
-        return x
-
 class MultiHeadAttention(nn.Module):
     def __init__(self, d_in, d_out, embedding_size, num_heads, dropout=0.1):
         super(MultiHeadAttention, self).__init__()
@@ -101,7 +81,22 @@ class TransformerBlock(nn.Module):
         self.mlp = MLP(embedding_size, dropout)
         self.norm1 = nn.LayerNorm(embedding_size)
         self.norm2 = nn.LayerNorm(embedding_size)
+    
+    def get_positional_encoding(self, num_tokens, embed_dim):
+        postional_embedding = torch.zeros(num_tokens, embed_dim, dtype=torch.float32)
+        positions = torch.arange(0, num_tokens, dtype=torch.float32)
+        for pos in positions:
+            for i in range(embed_dim):
+                if i%2 == 0:
+                    positional_embedding[pos, i] = math.sin(pos / (10000 ** (i/embed_dim)))
+                else:
+                    positional_embedding[pos, i] = math.cos(pos / (10000 ** ((i-1)/embed_dim)))
+        return positional_embedding
+
     def forward(self, x):
+        batch_size, num_tokens, embed_dim = x.shape
+        positional_embedding = self.get_positional_encoding(num_tokens, embed_dim)
+        x = x + positional_embedding
         residuals = x.clone()
         x = self.norm1(x)
         x = self.attention(x)
@@ -140,3 +135,23 @@ class ImageTransformer(nn.Module):
 
 class VQVAE(nn.Module):
     def __init__(self, frame_size)
+
+class VideoTransformer(nn.Module):
+    def __init__(self, num_heads, num_layers, embedding_size, dropout=0.1):
+        super(VideoTransformer, self).__init__()
+        self.num_heads = num_heads
+        self.num_layers = num_layers
+        self.embedding_size = embedding_size
+        self.dropout = dropout
+        self.transformer_blocks = nn.ModuleList([
+            TransformerBlock(
+                embedding_size=embedding_size,
+                num_heads=num_heads,
+                dropout=dropout
+            ) for _ in range(num_layers)
+        ])
+    
+    def forward(self, x):
+        for block in self.transformer_blocks:
+            x = block(x)
+        return x
